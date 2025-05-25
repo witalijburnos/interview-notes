@@ -1,4 +1,3 @@
-// App.js
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -7,72 +6,34 @@ import QuestionList from './components/QuestionList';
 import SavedPairs from './components/SavedPairs';
 
 import { setUrl, fetchQuestions } from './redux/videoSlice';
-import {
-  fetchSavedPairs,
-  getAnswer,
-  savePair,
-  deletePair,
-} from './utils/api';
+import { loadSavedPairs, addPair, removePair } from './redux/savedSlice';
 
 function App() {
   const dispatch = useDispatch();
 
-  // Подключаем Redux-состояние
   const url = useSelector((state) => state.video.url);
   const questions = useSelector((state) => state.video.questions);
   const loading = useSelector((state) => state.video.loading);
   const error = useSelector((state) => state.video.error);
 
-  // Эти состояния пока останутся локальными
-  const [loadingAnswers, setLoadingAnswers] = React.useState({});
-  const [answers, setAnswers] = React.useState({});
-  const [savedPairs, setSavedPairs] = React.useState([]);
-  const [savedStatus, setSavedStatus] = React.useState({});
+  const savedPairs = useSelector((state) => state.saved.pairs);
+  const savedStatus = useSelector((state) => state.saved.statusMap);
 
-  // Загрузка сохранённых пар при первом рендере
   React.useEffect(() => {
-    fetchSavedPairsData();
-  }, []);
-
-  const fetchSavedPairsData = async () => {
-    try {
-      const data = await fetchSavedPairs();
-      setSavedPairs(data);
-      setSavedStatus(
-        data.reduce((acc, pair) => {
-          acc[pair.question] = true;
-          return acc;
-        }, {})
-      );
-    } catch (err) {
-      console.error('Error retrieving saved data:', err.message);
-    }
-  };
+    dispatch(loadSavedPairs());
+  }, [dispatch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     dispatch(fetchQuestions(url));
   };
 
-  const fetchAnswerForQuestion = async (question) => {
-    setLoadingAnswers((prev) => ({ ...prev, [question]: true }));
-    try {
-      const data = await getAnswer(question);
-      setAnswers((prev) => ({ ...prev, [question]: data.answer }));
-    } catch (err) {
-      console.error('Error fetching answer:', err.message);
-    } finally {
-      setLoadingAnswers((prev) => ({ ...prev, [question]: false }));
-    }
-  };
-
-  const toggleSavePair = async (question, answer) => {
+  const toggleSavePair = (question, answer) => {
     if (savedStatus[question]) {
-      await deletePair(question);
+      dispatch(removePair(question));
     } else {
-      await savePair(question, answer);
+      dispatch(addPair({ question, answer }));
     }
-    fetchSavedPairsData(); // Обновим список после изменения
   };
 
   return (
@@ -100,9 +61,6 @@ function App() {
         <h2 className="fs-2">Results:</h2>
         <QuestionList
           questions={questions}
-          answers={answers}
-          loadingAnswers={loadingAnswers}
-          fetchAnswer={fetchAnswerForQuestion}
           savedStatus={savedStatus}
           toggleSavePair={toggleSavePair}
         />
