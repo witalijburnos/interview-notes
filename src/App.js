@@ -1,27 +1,36 @@
-// Main React component that acts as the root of the frontend application.
-// - Manages state for questions, answers, and saved pairs.
-// - Handles form submission and user interactions.
-// - Uses child components (QuestionList and SavedPairs) to display data.
-
-
-import React, { useState, useEffect } from 'react';
+// App.js
+import React from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css';
+
 import QuestionList from './components/QuestionList';
 import SavedPairs from './components/SavedPairs';
-import { fetchSavedPairs, getTranscript, getAnswer, savePair, deletePair } from './utils/api';
+
+import { setUrl, fetchQuestions } from './redux/videoSlice';
+import {
+  fetchSavedPairs,
+  getAnswer,
+  savePair,
+  deletePair,
+} from './utils/api';
 
 function App() {
-  const [inputValue, setInputValue] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [loadingAnswers, setLoadingAnswers] = useState({});
-  const [error, setError] = useState(null);
-  const [questions, setQuestions] = useState([]);
-  const [answers, setAnswers] = useState({});
-  const [savedPairs, setSavedPairs] = useState([]);
-  const [savedStatus, setSavedStatus] = useState({});
+  const dispatch = useDispatch();
 
-  useEffect(() => {
+  // Подключаем Redux-состояние
+  const url = useSelector((state) => state.video.url);
+  const questions = useSelector((state) => state.video.questions);
+  const loading = useSelector((state) => state.video.loading);
+  const error = useSelector((state) => state.video.error);
+
+  // Эти состояния пока останутся локальными
+  const [loadingAnswers, setLoadingAnswers] = React.useState({});
+  const [answers, setAnswers] = React.useState({});
+  const [savedPairs, setSavedPairs] = React.useState([]);
+  const [savedStatus, setSavedStatus] = React.useState({});
+
+  // Загрузка сохранённых пар при первом рендере
+  React.useEffect(() => {
     fetchSavedPairsData();
   }, []);
 
@@ -35,30 +44,14 @@ function App() {
           return acc;
         }, {})
       );
-    } catch (error) {
-      console.error('Error retrieving saved data:', error.message);
-      setError('Failed to load saved pairs.');
+    } catch (err) {
+      console.error('Error retrieving saved data:', err.message);
     }
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      const data = await getTranscript(inputValue);
-      if (data.questions) {
-        setQuestions(data.questions);
-      } else {
-        setError(data.error || 'Invalid data format.');
-      }
-    } catch (error) {
-      console.error('Error fetching transcript:', error.message);
-      setError('Failed to fetch transcript.');
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    dispatch(fetchQuestions(url));
   };
 
   const fetchAnswerForQuestion = async (question) => {
@@ -66,9 +59,8 @@ function App() {
     try {
       const data = await getAnswer(question);
       setAnswers((prev) => ({ ...prev, [question]: data.answer }));
-    } catch (error) {
-      console.error('Error fetching answer:', error.message);
-      setError('Failed to fetch answer.');
+    } catch (err) {
+      console.error('Error fetching answer:', err.message);
     } finally {
       setLoadingAnswers((prev) => ({ ...prev, [question]: false }));
     }
@@ -77,11 +69,10 @@ function App() {
   const toggleSavePair = async (question, answer) => {
     if (savedStatus[question]) {
       await deletePair(question);
-      fetchSavedPairsData();
     } else {
       await savePair(question, answer);
-      fetchSavedPairsData();
     }
+    fetchSavedPairsData(); // Обновим список после изменения
   };
 
   return (
@@ -93,8 +84,8 @@ function App() {
           <div className="input-group">
             <input
               type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              value={url}
+              onChange={(e) => dispatch(setUrl(e.target.value))}
               placeholder="YouTube link"
               className="form-control fs-4"
             />
